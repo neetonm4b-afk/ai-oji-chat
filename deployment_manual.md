@@ -1,80 +1,71 @@
-# Vercel デプロイ・運用マニュアル
+# Vercel デプロイ・運用マニュアル (決定版)
 
-このドキュメントでは、Node.js + Expressで構築した「AIおぢ」チャットボットをVercelに公開し、運用するための手順を解説します。
+このドキュメントでは、「AIおぢ」チャットボットを Vercel に公開し、安定して運用するための手順と、これまでに解決した不具合の対策をまとめています。
 
 ---
 
 ## 1. 事前準備
-デプロイを開始する前に、以下の準備ができているか確認してください。
-- [GitHub](https://github.com/) アカウントの作成
-- [Vercel](https://vercel.com/) アカウントの作成（GitHub連携でログインを推奨）
-- ターミナルで `git` コマンドが使えること
+- **GitHub**: コードを管理する場所。Vercelと連携して自動デプロイを行います。
+- **Vercel**: サーバーレス環境。`/tmp` フォルダ以外は書き込み禁止という制限があります。
+- **ANTHROPIC_API_KEY**: Claudeを利用するためのAPIキー。
 
 ---
 
-## 2. GitHubへのアップロード (Push)
+## 2. デプロイの手順
 
-コードの変更をGitHubに送信することで、Vercelがそれを検知して自動デプロイできるようになります。
-
-### 初回設定（済んでいる場合は不要）
-```powershell
-git init
-git add .
-git commit -m "Initial commit"
-git branch -M main
-git remote add origin https://github.com/neetonm4b-afk/ai-oji-chat.git
-git push -u origin main
-```
-
-### 次回以降の更新時
-コードを修正した後は、以下の3行を実行するだけでVercelが自動的に最新版に更新されます。
+### A. GitHub経由（推奨：日常の更新）
+手元のPCでコードを修正したら、以下の3つのコマンドで反映します。
 ```powershell
 git add .
 git commit -m "修正内容のメモ"
 git push origin main
 ```
 
----
-
-## 3. Vercelへのデプロイ (CLI活用)
-
-Web画面でボタンが見つからないなどのトラブルを避けるため、確実な **Vercel CLI** を使った方法を推奨します。
-
-### 3-1. プロジェクトの紐付け (Link)
-プロジェクトフォルダ内で以下を実行します。
-```powershell
-npx vercel link
-```
-- すべて **Enterキー** で進めます。
-
-### 3-2. 環境変数の設定
-APIキーをVercelに登録します。
-```powershell
-npx vercel env add ANTHROPIC_API_KEY
-```
-- **Value**: ClaudeのAPIキー（`sk-ant-...`）を貼り付けてEnter。
-- **Mark as sensitive?**: **`y`** を選択。
-- **Environments**: **`a`** を押したあと、**`Development` のチェックを外して** Enter。
-
-### 3-3. 公開実行 (Deploy)
+### B. Vercel CLI経由（確実な公開）
+Gitの反映だけでは不安な場合や、環境変数を設定した直後などは以下を実行します。
 ```powershell
 npx vercel --prod
 ```
 
 ---
 
-## 4. トラブルシューティング
+## 3. 解決済みの重要トラブル・設定
 
-### Q. 「接続に問題がある」と表示される
-- Vercelの管理画面で、`ANTHROPIC_API_KEY` が正しく登録されているか再確認してください。
+### ① 読み取り専用エラー (EROFS) 対策
+Vercelのメインフォルダには書き込みができないため、AIの知識（`knowledge_base.json`）を保存する場所を **`/tmp` ディレクトリ** に自動変更するようにコードを調整済みです。これにより、ブラウザ上から知識を保存してもクラッシュしません。
 
-### Q. 変更が反映されない
-- `git push origin main` を実行したか確認してください。
+### ② ルーティング (Cannot GET /) 対策
+Vercelですべてのパス（/ や /chat）を正常に処理するため、`vercel.json` に以下の設定を加えています。
+```json
+{
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/server.js" }
+  ]
+}
+```
+また、`server.js` 側でも `index.html` を絶対パスで返すように修正し、トップページが表示されない問題を解消しています。
+
+### ③ 最新モデルの指定
+常に最新の知能を利用するため、モデル名は `claude-sonnet-4-6`（2026年時点の最新）を指定しています。
 
 ---
 
-## 5. 運用のアドバイス
-- **恒久的なナレッジ設定**:
-    - **ブラウザ上の管理画面での保存**: Vercel上では `/tmp` フォルダに保存されるため、サーバーの再起動時にリセットされます（一時的なデバッグや更新には適しています）。
-    - **永続的な保存**: ずっと覚えさせておきたい内容は、PC上の `knowledge_base.json` に直接書き込んでから `git push`（またはデプロイ実行）してください。これにより、ソースコードの一部として永続化されます。
-    - **将来の改善**: 大規模な運用や頻繁な更新が必要な場合は、Vercel Blob や外部データベース（Supabase/MongoDB等）への移行を検討してください。
+## 4. 運用のアドバイス（重要）
+
+### ナレッジベースの「永続化」について
+Vercelの `/tmp` フォルダは、サーバーの再起動のたびに初期化されます。
+- **ブラウザから保存した場合**: 即座にAIに反映されますが、再起動（数時間〜数日）でリセットされます。
+- **ずっと残したい場合**: 手元のPCにある `knowledge_base.json` を直接編集し、`git push` してください。これが「初期状態」としてVercelに送り込まれます。
+
+### 環境変数の追加方法 (CLI)
+新しいAPIキーを登録する場合は以下を実行します。
+```powershell
+npx vercel env add ANTHROPIC_API_KEY
+```
+
+---
+
+## 5. 困ったときは
+- **「Cannot GET /...」が出る**: `vercel.json` がリポジトリに含まれているか確認してください。
+- **AIが返事をしない**: Vercelの管理画面（Logs）で「ANTHROPIC_API_KEY」のエラーが出ていないか確認してください。
+- **ブラウザでデバッグ**: [URL]/chat に直接アクセスして `{"message": "Hello from chat!"}` が出るか確認することで、サーバーが生きているかチェックできます。
