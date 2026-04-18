@@ -111,8 +111,23 @@ if (require.main === module) {
 module.exports = app;
 
 // === ここから追加 ===
-app.all('/chat', (req, res) => {
-  res.json({ message: "Hello from chat!" });
+app.post('/chat', async (req, res) => {
+  try {
+    const { message } = req.body;
+    
+    if (!message) {
+      return res.status(400).json({ error: "メッセージを入力してください" });
+    }
+
+    // ここに後でClaudeなどのAPIを入れる
+    const reply = `あなたが言ったこと: ${message}\n\n（まだAIは繋がってないよ）`;
+
+    res.json({ reply });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "エラーが発生しました" });
+  }
 });
 
 const PORT = process.env.PORT || 3000;
