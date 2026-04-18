@@ -7,8 +7,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const tabBtns = document.querySelectorAll('.tab-btn');
     const tabContents = document.querySelectorAll('.tab-content');
 
-    let chatHistory = [];
-
     // Tab Switching
     tabBtns.forEach(btn => {
         btn.addEventListener('click', () => {
@@ -41,45 +39,42 @@ document.addEventListener('DOMContentLoaded', () => {
         appendMessage('user', text);
         userInput.value = '';
         userInput.style.height = 'auto';
-
-        // Add to history
-        chatHistory.push({ role: 'user', content: text });
+        sendBtn.disabled = true;
 
         // Show typing indicator
         const typingId = appendTypingIndicator();
 
         try {
-            const response = await fetch('/api/chat', {
+            const response = await fetch('/chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ messages: chatHistory })
+                body: JSON.stringify({ message: text }) // Updated to match new server.js format
             });
 
             if (!response.ok) {
                 const errorData = await response.json();
-                console.error('Server error:', errorData);
-                throw new Error(errorData.details || 'Server error');
+                throw new Error(errorData.error || 'Server error');
             }
 
             const data = await response.json();
             removeTypingIndicator(typingId);
 
-            if (data.content && data.content[0]) {
-                const botText = data.content[0].text;
-                appendMessage('bot', botText);
-                chatHistory.push({ role: 'assistant', content: botText });
+            if (data.reply) {
+                appendMessage('bot', data.reply);
             } else {
-                throw new Error('Invalid response');
+                throw new Error('Invalid response format');
             }
         } catch (error) {
             console.error(error);
             removeTypingIndicator(typingId);
-            appendMessage('bot', '申し訳ない。接続に少し問題があるようだ。時間をおいて試してみてくれるかい？');
+            appendMessage('bot', '済まない... 話の途中で少しつまずいてしまったようだ。もう一度送ってみてくれるかい？');
+        } finally {
+            sendBtn.disabled = false;
         }
     }
 
     sendBtn.addEventListener('click', sendMessage);
-    userInput.addEventListener('keypress', (e) => {
+    userInput.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
             sendMessage();
@@ -121,7 +116,15 @@ document.addEventListener('DOMContentLoaded', () => {
     function appendMessage(role, text) {
         const msgDiv = document.createElement('div');
         msgDiv.className = `message ${role}`;
-        msgDiv.innerHTML = `<div class="message-content">${text.replace(/\n/g, '<br>')}</div>`;
+        
+        // Handle line breaks and basic escaping
+        const content = text
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/\n/g, '<br>');
+
+        msgDiv.innerHTML = `<div class="message-content">${content}</div>`;
         chatMessages.appendChild(msgDiv);
         chatMessages.scrollTop = chatMessages.scrollHeight;
     }
@@ -131,7 +134,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const msgDiv = document.createElement('div');
         msgDiv.className = 'message bot typing';
         msgDiv.id = id;
-        msgDiv.innerHTML = `<div class="message-content">AIおぢが考えています...</div>`;
+        msgDiv.innerHTML = `
+            <div class="message-content">
+                <span class="dot"></span>
+                <span class="dot"></span>
+                <span class="dot"></span>
+            </div>`;
         chatMessages.appendChild(msgDiv);
         chatMessages.scrollTop = chatMessages.scrollHeight;
         return id;
@@ -141,26 +149,4 @@ document.addEventListener('DOMContentLoaded', () => {
         const el = document.getElementById(id);
         if (el) el.remove();
     }
-
-    // PWA Install Logic
-    let deferredPrompt;
-    const installBanner = document.getElementById('install-banner');
-    const installBtn = document.getElementById('install-btn');
-
-    window.addEventListener('beforeinstallprompt', (e) => {
-        e.preventDefault();
-        deferredPrompt = e;
-        installBanner.classList.remove('hidden');
-    });
-
-    installBtn.addEventListener('click', () => {
-        installBanner.classList.add('hidden');
-        deferredPrompt.prompt();
-        deferredPrompt.userChoice.then((choiceResult) => {
-            if (choiceResult.outcome === 'accepted') {
-                console.log('User accepted the install prompt');
-            }
-            deferredPrompt = null;
-        });
-    });
 });
