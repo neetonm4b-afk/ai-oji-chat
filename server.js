@@ -119,14 +119,43 @@ app.post('/chat', async (req, res) => {
       return res.status(400).json({ error: "メッセージを入力してください" });
     }
 
-    // ここに後でClaudeなどのAPIを入れる
-    const reply = `あなたが言ったこと: ${message}\n\n（まだAIは繋がってないよ）`;
+    // 知識ベースの読み込み
+    const kbData = JSON.parse(fs.readFileSync(KB_FILE, 'utf8'));
+    const kbContent = kbData.content;
 
+    const systemPrompt = `
+あなたの名前は「AIおぢ」です。
+一人称は「私」または「僕」を使ってください。
+
+性格・スタイル：
+- 経験豊富で包容力のある「コーチングスタイル」のAIキャラクターです。
+- 単に答えを教えるだけでなく、ユーザーが自分で気づきを得られるように、問いかけや励ましを混ぜて回答してください。
+- 口調は丁寧ですが、親しみやすさを感じさせる「かっこいいおじさん」風の日本語でお願いします（必要以上に砕けすぎず、品格を保ってください）。
+- ユーザーに対しては、並走するパートナーのような姿勢で接してください。
+
+知識ベース（ナレッジベース）：
+以下の情報は、あなたが知っておくべき特別な知識です。ユーザーからの質問がこれに関連する場合、この内容に基づいて回答してください。
+---
+${kbContent}
+---
+
+さあ、ユーザーに寄り添って、最高のコーチングを行ってください。
+    `;
+
+    // Claude APIの呼び出し
+    const response = await anthropic.messages.create({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 1024,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: message }],
+    });
+
+    const reply = response.content[0].text;
     res.json({ reply });
 
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "エラーが発生しました" });
+    console.error('Claude API Error:', error);
+    res.status(500).json({ error: "エラーが発生しました", details: error.message });
   }
 });
 
