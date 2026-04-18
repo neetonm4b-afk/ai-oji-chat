@@ -109,3 +109,14 @@ if (require.main === module) {
 }
 
 module.exports = app;
+
+// === ここから追加 ===
+app.post('/chat', async (req, res) => {
+  res.json({ message: "Hello from chat!" });
+});
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
+// === ここまで追加 ===
