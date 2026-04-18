@@ -18,7 +18,12 @@ const anthropic = new Anthropic({
 
 app.use(cors());
 app.use(bodyParser.json());
-app.use(express.static('public'));
+app.use(express.static(path.join(__dirname, 'public')));
+
+// Root route to serve index.html
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
 
 const KB_FILE = path.join(os.tmpdir(), 'knowledge_base.json');
 
