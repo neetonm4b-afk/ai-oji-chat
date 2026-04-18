@@ -5,6 +5,7 @@ const cors = require('cors');
 const bodyParser = require('body-parser');
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 
 dotenv.config();
 
@@ -19,11 +20,17 @@ app.use(cors());
 app.use(bodyParser.json());
 app.use(express.static('public'));
 
-const KB_FILE = 'knowledge_base.json';
+const KB_FILE = path.join(os.tmpdir(), 'knowledge_base.json');
 
-// Initialize KB file if it doesn't exist
+// Initialize KB file in temp directory if it doesn't exist
 if (!fs.existsSync(KB_FILE)) {
-  fs.writeFileSync(KB_FILE, JSON.stringify({ content: '' }));
+  const bundledKB = path.join(__dirname, 'knowledge_base.json');
+  if (fs.existsSync(bundledKB)) {
+    // Copy bundled data to writable temp directory
+    fs.copyFileSync(bundledKB, KB_FILE);
+  } else {
+    fs.writeFileSync(KB_FILE, JSON.stringify({ content: '' }));
+  }
 }
 
 // Get Knowledge Base
