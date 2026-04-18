@@ -111,7 +111,7 @@ if (require.main === module) {
 module.exports = app;
 
 // === ここから追加 ===
-app.post('/chat', async (req, res) => {
+app.all('/chat', (req, res) => {
   res.json({ message: "Hello from chat!" });
 });
 
